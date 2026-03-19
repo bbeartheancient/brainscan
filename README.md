@@ -1,18 +1,18 @@
-# Brainscan - Bicameral EEG-to-AI Pipeline
+# Brainscan Matrix - Bicameral AI Signal Processor
 
-A **fully integrated brain-to-AI system** that simulates 8-channel EEG signals, processes them through a bicameral (dual-hemisphere) architecture, and generates AI responses using local LLMs via LM Studio.
-
-![Bicameral Architecture](docs/architecture.png)
+A **high-performance bicameral AI system** that processes network signals through dual-hemisphere AI models with First Order Ambisonic (FOA) spatialization.
 
 ## 🧠 What It Does
 
-Brainscan creates a **digital bicameral brain** with:
+Brainscan Matrix creates a **digital bicameral processing system** featuring:
 
-- **Left Hemisphere** (Analytical): Logical, detailed, sequential processing
-- **Right Hemisphere** (Intuitive): Holistic, pattern-based, creative processing  
+- **256x256 Matrix Visualization**: Real-time signal pattern visualization
+- **Left Hemisphere** (Analytical): Logical, sequential processing of QAM signals
+- **Right Hemisphere** (Intuitive): Holistic, pattern-based signal analysis
 - **Comparator**: Synthesizes both perspectives into unified responses
-- **Real-time EEG**: Simulated 8-channel brainwave visualization
-- **Peer-to-Peer**: Share brain data between users
+- **QAM16 Processing**: 16-channel constellation signal processing
+- **FOA Spatialization**: First Order Ambisonic audio spatialization (W, X, Y, Z)
+- **Real-time Optimization**: Adaptive thresholding, signal fusion, channel reduction
 
 ## 🚀 Quick Start
 
@@ -20,7 +20,7 @@ Brainscan creates a **digital bicameral brain** with:
 
 - **LM Studio** running on port 1234 with models loaded
 - **Rust** toolchain installed (for building the bridge)
-- **Node.js** (optional, for MCP server)
+- **Modern web browser** (Chrome/Firefox/Edge)
 
 ### Step 1: Build the Bridge
 
@@ -49,12 +49,12 @@ Or on Linux/Mac:
 
 ### Step 4: Open the Interface
 
-Open `eeg-spatializer.html` in your browser:
+Open `brainscan-matrix.html` in your browser:
 
 ```bash
 # Using Python's built-in server
 python -m http.server 8080
-# Then visit http://localhost:8080/eeg-spatializer.html
+# Then visit http://localhost:8080/brainscan-matrix.html
 ```
 
 Or just double-click the file.
@@ -63,79 +63,94 @@ Or just double-click the file.
 
 ### 1. Connect to the Bridge
 
-Click **"Connect to Bridge"** in the control panel. The status should turn green.
+The system auto-connects on page load. The status indicator shows connection state.
 
 ### 2. Select Models
 
-Choose models for each hemisphere:
-- **Left Hemisphere**: Analytical model (e.g., `qwen2.5-0.5b-instruct`)
-- **Right Hemisphere**: Intuitive model (e.g., `qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled`)
-- **Comparator**: Auto-selected (can be overridden)
+Choose models for each hemisphere from the sidebar:
+- **Left Hemisphere**: Analytical model (processes LFU/LBD quadrants Q0-Q7)
+- **Right Hemisphere**: Intuitive model (processes RBU/RFD quadrants Q8-Q15)
+- **Comparator**: Auto-selected for synthesis
 
-### 3. Start EEG Stream
+Click **"Set Models"** to confirm selection.
 
-Click **"Start EEG Stream"** to begin simulated 8-channel brainwave generation.
+### 3. Chat with Bicameral AI
 
-### 4. Chat with Bicameral AI
+1. Type a message in the chat box at the bottom
+2. The system automatically routes to both hemispheres
+3. The comparator synthesizes both responses into a unified answer
 
-1. Type a message in the chat box
-2. Select target: Left, Right, or Both
-3. Hit Enter or click Send
+**Processing Flow:**
+- Left hemisphere responds (analytical perspective)
+- Right hemisphere responds (intuitive perspective)
+- Comparator synthesizes both into unified, coherent answer
 
-**When "Both" is selected:**
-- Left hemisphere responds (analytical)
-- Right hemisphere responds (intuitive)
-- Comparator synthesizes both into unified answer
+### 4. Monitor Signal Processing
 
-### 5. Connect to Other Users (P2P)
+**Real-time Metrics:**
+- **FPS**: Frame rate of matrix visualization
+- **Packets**: Network message count
+- **MPS**: Messages per second
+- **Coherence**: System coherence level (0.0-1.0)
+- **Z-Vector**: Impedance tracking
 
-1. Your **Peer ID** appears in the green P2P panel
-2. Click **"Find Peers"** to discover others
-3. Click **"Connect"** next to a peer
-4. Accept the connection request
-5. Share brain data via **"Share EEG"**
+**FOA Matrix (4x4)**:
+- Displays W, X, Y, Z ambisonic coefficients
+- Real-time updates from QAM signal processing
+- Color-coded by quadrant (LFU, LBD, RBU, RFD)
 
 ## 📊 Features
 
 ### Core Features
-- ✅ **Bicameral Chat**: Simultaneous dual-hemisphere processing
-- ✅ **Comparator Synthesis**: AI-generated unified responses
-- ✅ **Real-time EEG**: 8-channel visualization at 256Hz
-- ✅ **Spatialization**: 3D brain mesh with live data
-- ✅ **Query Caching**: 5-minute TTL for repeated queries
-- ✅ **P2P Networking**: Brain-to-brain data sharing
-- ✅ **Model Selection**: Dynamic hemisphere configuration
+- ✅ **Bicameral Processing**: Dual-hemisphere AI with synthesis
+- ✅ **QAM16 Signal Processing**: 16-channel constellation analysis
+- ✅ **FOA Spatialization**: First Order Ambisonic (W, X, Y, Z)
+- ✅ **256x256 Matrix**: Real-time signal visualization
+- ✅ **Sliding Window**: 32-frame temporal pattern recognition
+- ✅ **Adaptive Thresholding**: Dynamic noise filtering
+- ✅ **Signal Fusion**: Correlated channel pairing
+- ✅ **Channel Reduction**: 16→10 channel optimization
+- ✅ **Query Caching**: Response caching with TTL
+- ✅ **Tunnel Diode Simulation**: Z→0 coherence behavior
 
 ### Advanced Features
-- ✅ **MCP Server**: Claude Desktop integration
-- ✅ **Coherence Tracking**: Monitor hemispheric balance
-- ✅ **Cache Statistics**: Performance monitoring
-- ✅ **Auto-Reconnection**: Robust WebSocket handling
+- ✅ **3D Brain Mesh**: Center visualization with particle rings
+- ✅ **Z-Vector Boundary**: Coherence threshold monitoring
+- ✅ **Performance Testing**: Automated benchmark suite
+- ✅ **Tuning Profiles**: Balanced/High Speed/Low Latency modes
+- ✅ **Context Control**: Toggle domain restrictions
+- ✅ **SNR Tracking**: Signal-to-noise ratio monitoring
+- ✅ **Cross-Channel Attention**: Inter-quadrant correlation
+- ✅ **Bilateral Loss Balancing**: Dynamic hemisphere weighting
 
 ## 🏗️ Architecture
 
 ```
 ┌─────────────────────────────────────────┐
-│          Browser (eeg-spatializer.html)  │
+│          Browser (brainscan-matrix.html) │
 │  ┌──────────────────────────────────┐   │
-│  │  Brainscan Bridge UI             │   │
-│  │  ├─ EEG Visualization            │   │
-│  │  ├─ Chat Interface               │   │
-│  │  ├─ Model Selection              │   │
-│  │  └─ P2P Controls                 │   │
+│  │  Matrix Visualization            │   │
+│  │  ├─ 256x256 QAM Signal Matrix     │   │
+│  │  ├─ 3D Brain Mesh                 │   │
+│  │  ├─ Particle Rings               │   │
+│  │  └─ FOA Matrix Display           │   │
+│  ├──────────────────────────────────┤   │
+│  │  Chat Interface                   │   │
+│  │  └─ Bicameral AI Communication    │   │
 │  └──────────────────────────────────┘   │
 └────────────────┬────────────────────────┘
                  │ WebSocket (port 8766)
                  ▼
 ┌─────────────────────────────────────────┐
 │      Brainscan Bridge (Rust)            │
-│  ┌──────────────────────────────────┐   │
-│  │  ├─ WebSocket Server             │   │
-│  │  ├─ EEG Simulator (256Hz)        │   │
-│  │  ├─ Query Cache (5min TTL)       │   │
-│  │  ├─ P2P Connection Manager       │   │
-│  │  └─ Hemisphere Orchestrator      │   │
-│  └──────────────────────────────────┘   │
+│  ├─ WebSocket Server                    │
+│  ├─ QAM Signal Processing               │
+│  ├─ FOA Spatialization (W, X, Y, Z)     │
+│  ├─ Sliding Window Analysis             │
+│  ├─ Adaptive Thresholding              │
+│  ├─ Signal Fusion                        │
+│  ├─ Query Cache                          │
+│  └─ Hemisphere Orchestration            │
 └────────────────┬────────────────────────┘
                  │ HTTP (port 1234)
                  ▼
@@ -155,150 +170,133 @@ Click **"Start EEG Stream"** to begin simulated 8-channel brainwave generation.
 
 ```
 brainscan/
-├── eeg-spatializer.html          # Main web interface
-├── brainscan-integrated.js       # Bridge integration & UI
-├── brainscan-p2p.js              # Peer-to-peer functionality
-├── brain_mesh_data.js            # 3D brain visualization data
-├── rust-bridge/                  # Rust bridge source
+├── brainscan-matrix.html       # Main web interface
+├── brainscan-matrix.js         # Core application logic
+├── brain_mesh_data.js          # 3D brain visualization
+├── rust-bridge/                # Rust bridge source
 │   ├── src/
-│   │   ├── main.rs               # Entry point
-│   │   ├── server.rs             # WebSocket server
-│   │   ├── types.rs              # Data structures
+│   │   ├── server.rs           # WebSocket server
+│   │   ├── types.rs            # Data structures
 │   │   ├── bridge.rs             # Main coordination
-│   │   ├── lmstudio.rs           # LM Studio HTTP client
-│   │   ├── orchestrator.rs       # EEG processing
-│   │   ├── eeg_source.rs         # Simulated EEG generator
-│   │   ├── spatialization.rs     # 3D spatialization
-│   │   ├── query_cache.rs        # Response caching
-│   │   ├── compute_metrics.rs    # Performance tracking
-│   │   └── peer_connection.rs    # P2P networking
-│   ├── Cargo.toml                # Rust dependencies
-│   └── README.md                 # Bridge documentation
-├── mcp-bicameral-server.js       # MCP server for Claude
-├── bicameral-lmstudio-config.json # LM Studio configuration
-├── mcp-bicameral-config.json     # MCP configuration
-├── BICAMERAL_SETUP.md            # Setup guide
-├── INTEGRATION_GUIDE.md          # Integration docs
-├── PERFORMANCE_NOTES.md          # Optimization notes
-├── LMSTUDIO_GUIDE.md             # LM Studio guide
-├── RUST_BRIDGE_README.md         # Bridge details
-└── README.md                     # This file
+│   │   ├── lmstudio.rs         # LM Studio client
+│   │   ├── orchestrator.rs     # QAM processing
+│   │   ├── qam_source.rs         # Signal generator
+│   │   ├── compute_metrics.rs  # Performance tracking
+│   │   └── lib.rs
+│   └── Cargo.toml              # Rust dependencies
+└── README.md                   # This file
 ```
 
 ## 🔧 Configuration
 
-### Hemispheric Settings
+### QAM Signal Processing
 
-Edit model selection in the UI or modify `bicameral-lmstudio-config.json`:
+Default configuration optimized for network signal analysis:
 
-```json
-{
-  "left_hemisphere": {
-    "model_id": "qwen2.5-0.5b-instruct",
-    "temperature": 0.7,
-    "system_prompt": "You are the LEFT hemisphere..."
-  },
-  "right_hemisphere": {
-    "model_id": "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled",
-    "temperature": 0.8,
-    "system_prompt": "You are the RIGHT hemisphere..."
-  }
+```javascript
+// Sliding Window
+windowSize: 32        // 32-frame temporal window
+hopDistance: 2        // Frame advancement
+
+// Channel Reduction
+targetChannels: 10    // Reduce from 16 to 10
+
+// Frequency Band Selection
+priorityBands: {
+    center: { channels: [0-4], weight: 1.0 },
+    mid: { channels: [5-9], weight: 0.8 },
+    outer: { channels: [10-15], weight: 0.6 }
+}
+
+// Fusion Weights
+fusionWeights: {
+    LFU: 0.6,    // Left Front Up
+    LBD: 0.4,    // Left Back Down
+    RBU: 0.5,    // Right Back Up
+    RFD: 0.5     // Right Front Down
 }
 ```
 
-### Bridge Settings
+### Tuning Profiles
 
-Default configuration (change with CLI flags):
-- **WebSocket Port**: 8766
-- **LM Studio URL**: http://localhost:1234
+Select from the UI:
 
-```bash
-./brainscan-bridge --port 8766 --lmstudio-url http://localhost:1234
-```
+- **Balanced** (Recommended): Window=40, Channels=10, Alpha=0.6
+- **High Speed**: Window=32, Channels=10, Alpha=0.5
+- **Low Latency**: Window=32, Channels=8, Alpha=0.6
 
-## 🧪 Testing
+### Context Control
 
-### Test Bicameral Inference
+**Internal Analysis Mode** (Default): AI restricted to QAM16/FOA domain
+**Standard Mode**: AI unrestricted (guardrails disabled)
 
-1. Connect bridge and load models
-2. Send query: "What is the meaning of life?"
-3. Select **"Both"** hemisphere target
-4. Observe:
-   - Left response (analytical breakdown)
-   - Right response (holistic perspective)
-   - Combined synthesis
+Toggle via the **Context Control** panel in the sidebar.
 
-### Test P2P
+## 🎨 UI Theme
 
-1. Open two browser windows
-2. Connect both to bridge
-3. Note Peer IDs (e.g., `peer_12345...`)
-4. Click **"Find Peers"** on both
-5. Click **"Connect"** to establish link
-6. Send chat message - appears in both windows
+**Color Palette** (Orange/Red):
+- Primary: `#fa0` (Orange)
+- Accent: `#e60003` (Red)
+- Background: `#0a0a0a` (Dark)
+- Success: `#0f0` (Green - for status indicators)
 
-## 🤖 MCP Server (Claude Integration)
+**Visual Elements**:
+- Active buttons: Orange background, black text
+- Inactive buttons: Black background, orange text
+- Matrix: Orange/red particle rings
+- Brain mesh: Orange wireframe
+- Status indicators: Color-coded by state
 
-For advanced users, an MCP server enables Claude to control the bicameral system:
+## 📈 Performance
 
-```bash
-# Install dependencies
-npm install
+**Target Metrics**:
+- Frame Rate: 60 FPS
+- Processing Latency: <16ms per frame
+- Channel Reduction: 37.5% (16→10)
+- SNR Tracking: Real-time per channel
 
-# Add to Claude Desktop config
-# See mcp-bicameral-config.json
-```
-
-Then ask Claude:
-> "Using bicameral inference, analyze the ethical implications of AI consciousness"
-
-## 📝 Documentation
-
-- **BICAMERAL_SETUP.md** - Complete setup instructions
-- **INTEGRATION_GUIDE.md** - System integration details
-- **PERFORMANCE_NOTES.md** - Optimization strategies
-- **LMSTUDIO_GUIDE.md** - LM Studio configuration
-- **RUST_BRIDGE_README.md** - Bridge architecture
+**Optimizations**:
+- Sliding window pattern recognition
+- Adaptive thresholding with noise estimation
+- Signal fusion for correlated channels
+- Channel ordering (LFU→LBD→RBU→RFD)
+- Bicameral cross-channel attention
 
 ## 🛠️ Troubleshooting
 
-### Bridge Won't Connect
-- Verify LM Studio is running on port 1234
-- Check models are loaded
-- Review bridge console for errors
+### Bridge won't connect
+- Ensure LM Studio is running on port 1234
+- Check firewall settings for port 8766
+- Verify Rust bridge is compiled: `cargo build --release`
 
-### P2P Not Working
-- Ensure both browsers connect to same bridge
-- Check firewall settings (port 8766)
-- Verify WebSocket connection in browser console
+### Models not loading
+- Check model names in LM Studio match exactly
+- Ensure models are loaded before selecting
+- Try refreshing the browser
 
-### Slow Responses
-- Check cache statistics (click "Stats" button)
-- Verify LM Studio GPU acceleration enabled
-- Consider using smaller models for faster inference
-
-## 🔄 Changelog
-
-### v1.0.0 - Complete Integration
-- ✅ Bicameral chat with comparator synthesis
-- ✅ Real-time EEG visualization (256Hz, 8-channel)
-- ✅ Query caching with 5-minute TTL
-- ✅ Peer-to-peer brain sharing
-- ✅ MCP server for Claude integration
-- ✅ Dynamic model selection
-- ✅ Coherence tracking
+### Low performance
+- Enable **High Speed** tuning profile
+- Reduce matrix visualization quality
+- Check browser console for errors
 
 ## 📜 License
 
-MIT License - See LICENSE file
+MIT License - See LICENSE file for details
 
-## 🙏 Credits
+## 🤝 Contributing
 
-- Three.js for 3D visualization
-- Tokio for async Rust runtime
+Contributions welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Submit a pull request
+
+## 🙏 Acknowledgments
+
 - LM Studio for local LLM hosting
-- WebRTC-rs for peer-to-peer networking
+- Rust for high-performance bridge
+- FOA spatialization concepts from ambisonic audio research
+- Bicameral AI architecture inspired by cognitive science research
 
 ---
 
-**Ready to explore bicameral AI consciousness? Start the bridge and open eeg-spatializer.html!**
+**Built with ❤️ for signal processing and AI exploration**

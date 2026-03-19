@@ -4,6 +4,7 @@ pub mod lmstudio;
 pub mod server;
 pub mod bridge;
 pub mod eeg_source;
+pub mod qam_source;  // QAM16 signal source (replaces EEG)
 pub mod spatialization;
 pub mod compute_metrics;
 pub mod query_cache;

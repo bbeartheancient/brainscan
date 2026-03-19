@@ -1,0 +1,26 @@
+# Rust build artifacts
+rust-bridge/target/
+Cargo.lock
+
+# Local executables (retain locally)
+*.exe
+
+# Node.js
+node_modules/
+package-lock.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Clean directory (legacy files stored locally)
+clean/

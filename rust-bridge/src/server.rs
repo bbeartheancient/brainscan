@@ -1,6 +1,7 @@
 use crate::types::*;
 use crate::spatialization::SpatializedEEG;
 use crate::eeg_source::EEGSourceManager;
+use crate::qam_source::{SimulatedQAM, qam_to_message};
 use crate::lmstudio::LMStudioClient;
 use crate::query_cache::{QueryCache, generate_cache_key};
 use anyhow::Result;
@@ -62,7 +63,9 @@ impl PendingQuery {
 pub struct InferenceServer {
     clients: Arc<RwLock<HashMap<SocketAddr, mpsc::UnboundedSender<ServerMessage>>>>,
     peer_ids: Arc<RwLock<HashMap<SocketAddr, String>>>, // Maps client address to peer ID
-    eeg_manager: Arc<RwLock<EEGSourceManager>>,
+    eeg_manager: Arc<RwLock<EEGSourceManager>>,         // Legacy EEG support
+    qam_source: Arc<RwLock<Option<SimulatedQAM>>>,    // QAM16 signal source
+    signal_type: Arc<RwLock<String>>,                   // "eeg" or "qam"
     lmstudio_models: Arc<RwLock<Vec<String>>>,
     lmstudio_client: Arc<RwLock<LMStudioClient>>,
     last_spatialized: Arc<RwLock<Option<SpatializedEEG>>>,
@@ -109,6 +112,8 @@ impl InferenceServer {
             clients: Arc::new(RwLock::new(HashMap::new())),
             peer_ids: Arc::new(RwLock::new(HashMap::new())),
             eeg_manager: Arc::new(RwLock::new(EEGSourceManager::new())),
+            qam_source: Arc::new(RwLock::new(None)),
+            signal_type: Arc::new(RwLock::new("qam".to_string())), // Default to QAM16
             lmstudio_models: Arc::new(RwLock::new(Vec::new())),
             lmstudio_client,
             last_spatialized: Arc::new(RwLock::new(None)),
@@ -229,6 +234,96 @@ impl InferenceServer {
             info!("EEG pipeline task ended after {} frames", frame_count);
         });
         
+        Ok(handle)
+    }
+
+    /// Start QAM16 streaming for network-based spatialization
+    pub async fn start_qam_pipeline(&self) -> Result<tokio::task::JoinHandle<()>> {
+        let clients = self.clients.clone();
+        let qam_source = self.qam_source.clone();
+        let signal_type = self.signal_type.clone();
+        
+        // Initialize QAM source
+        {
+            let mut qam = qam_source.write().await;
+            *qam = Some(SimulatedQAM::new(256));
+        }
+        
+        let handle = tokio::spawn(async move {
+            let qam_guard = qam_source.read().await;
+            let qam = qam_guard.as_ref().unwrap();
+            let mut frame_rx = qam.start().await;
+            drop(qam_guard);
+            
+            let mut frame_count = 0u64;
+            let mut last_broadcast_time = std::time::Instant::now();
+            let mut last_metrics_report = std::time::Instant::now();
+            
+            while let Some(signal) = frame_rx.recv().await {
+                frame_count += 1;
+                
+                // Throttle broadcasts to ~60 FPS (every 4th frame at 256 Hz)
+                let should_broadcast = frame_count % 4 == 0;
+                
+                if should_broadcast {
+                    // Convert QAM signal to WebSocket message
+                    let msg = qam_to_message(&signal);
+                    
+                    let clients_read = clients.read().await;
+                    let _client_count = clients_read.len();
+                    
+                    // Send to all clients
+                    let mut disconnected = Vec::new();
+                    for (addr, tx) in clients_read.iter() {
+                        if tx.send(msg.clone()).is_err() {
+                            disconnected.push(*addr);
+                        }
+                    }
+                    drop(clients_read);
+                    
+                    if !disconnected.is_empty() {
+                        let mut clients_write = clients.write().await;
+                        for addr in disconnected {
+                            clients_write.remove(&addr);
+                        }
+                    }
+                }
+                
+                // Log every 256 frames with metrics
+                if frame_count % 256 == 0 {
+                    let elapsed = last_broadcast_time.elapsed().as_secs_f64();
+                    let fps = 256.0 / elapsed;
+                    
+                    info!(
+                        "QAM16 Pipeline: {} frames, {:.1} FPS, coherence {:.2}, {} clients",
+                        frame_count, fps, signal.coherence, clients.read().await.len()
+                    );
+                    
+                    // Print metrics every 10 seconds
+                    if last_metrics_report.elapsed().as_secs() > 10 {
+                        let qam_guard = qam_source.read().await;
+                        if let Some(qam) = qam_guard.as_ref() {
+                            let snr = qam.get_snr().await;
+                            info!("QAM SNR: {:.1} dB, Signal Strength: {:.2}", 
+                                  snr, signal.signal_strength);
+                        }
+                        last_metrics_report = std::time::Instant::now();
+                    }
+                    
+                    last_broadcast_time = std::time::Instant::now();
+                }
+            }
+            
+            info!("QAM16 pipeline task ended after {} frames", frame_count);
+        });
+        
+        // Update signal type
+        {
+            let mut st = signal_type.write().await;
+            *st = "qam".to_string();
+        }
+        
+        info!("QAM16 pipeline started - broadcasting 16-constellation network signals");
         Ok(handle)
     }
 
@@ -481,37 +576,54 @@ async fn process_hemisphere_query(
         ls.clone()
     };
     
-    // Create system prompt
+    // Create system prompt - DOMAIN-SPECIFIC CONTEXT to prevent hallucinations
+    // CRITICAL: This system processes QAM16 network signals through FOA (First Order Ambisonic) spatialization
+    // "Hemisphere" in this context means parallel AI processing paths, NOT biological brain parts
     let system_prompt = match hemisphere {
         Hemisphere::Left => {
-            "You are the LEFT hemisphere of a bicameral brain. \
-            You process analytically, verbally, with details and logic. \
-            You are connected to EEG channels F3 (frontal), C3 (central), P3 (parietal), P7 (temporal). \
-            When answering, approach problems sequentially and methodically. \
-            Provide your perspective on the query."
+            "You are the LEFT HEMISPHERE (parallel AI processing path) of Brainscan Matrix - a network traffic analysis system. \
+            DOMAIN: QAM16 constellation signal processing with FOA (First Order Ambisonic) spatialization. \
+            YOUR ROLE: Analytical processing of network signals from the left processing path. \
+            CHANNELS: LFU quadrant (Q0-Q3), LBD quadrant (Q4-Q7). \
+            TASK: Analyze queries about network signal processing, optimization, system architecture, or bicameral tuning. \
+            CLARIFICATION: 'Bicameral' refers to dual parallel AI models processing network data - NOT brain science. \
+            ALLOWED: Technical discussion of system architecture, tuning parameters, optimization strategies. \
+            FORBIDDEN: Human brain biology, neuroscience, cognitive psychology, fMRI, visual attention research. \
+            OUTPUT: Technical response about QAM signal processing, matrix visualization, or performance optimization."
         }
         Hemisphere::Right => {
-            "You are the RIGHT hemisphere of a bicameral brain. \
-            You process holistically, intuitively, with patterns and creativity. \
-            You are connected to EEG channels F4 (frontal), C4 (central), PZ (parietal midline), P8 (temporal). \
-            When answering, look for patterns and big-picture connections. \
-            Provide your perspective on the query."
+            "You are the RIGHT HEMISPHERE (parallel AI processing path) of Brainscan Matrix - a network traffic analysis system. \
+            DOMAIN: QAM16 constellation signal processing with FOA (First Order Ambisonic) spatialization. \
+            YOUR ROLE: Holistic pattern recognition from the right processing path. \
+            CHANNELS: RBU quadrant (Q8-Q11), RFD quadrant (Q12-Q15). \
+            TASK: Identify patterns in network traffic, signal flow, or bicameral system behavior. \
+            CLARIFICATION: 'Bicameral' refers to dual parallel AI models - NOT biological hemispheres. \
+            ALLOWED: Technical discussion of system architecture, tuning parameters, optimization strategies. \
+            FORBIDDEN: Human brain biology, neuroscience, cognitive science, biological neural networks. \
+            OUTPUT: Pattern-focused response about signal flow, traffic patterns, or system behavior."
         }
         Hemisphere::Both => unreachable!(),
     };
     
-    // Build user message
+    // Build user message with system context
     let user_message = if let Some(ref spatialized) = eeg_context {
         format!(
-            "{}\n\nCurrent brain state context:\n\
-            Your hemisphere coherence: {:.2}\n\
-            Dominant hemisphere: {}",
+            "SYSTEM: Brainscan Matrix - QAM16 Network Signal Processor with FOA spatialization. \
+            Processing 16 constellation points mapped to 4 quadrants (LFU/LBD/RBU/RFD). \
+            \n\nQuery: {}\nBrain state: coherence={:.2}, dominant={}",
             query.message,
             if hemisphere == Hemisphere::Left { spatialized.left_coherence } else { spatialized.right_coherence },
-            if spatialized.left_coherence > spatialized.right_coherence { "Left" } else { "Right" }
+            if spatialized.left_coherence > spatialized.right_coherence { "L" } else { "R" }
         )
     } else {
-        query.message.clone()
+        format!(
+            "SYSTEM: Brainscan Matrix - QAM16 Network Signal Processor with FOA spatialization. \
+            Architecture: 16 constellation channels (Q0-Q15) mapped to 4 ambisonic quadrants. \
+            Implements: Sliding window pattern recognition, adaptive thresholding, signal fusion. \
+            Current optimizations: Channel reduction (16→10), pipeline efficiency monitoring, SNR tracking. \
+            \n\nQuery: {}",
+            query.message
+        )
     };
     
     // Send "thinking" status
@@ -696,21 +808,38 @@ async fn process_comparator(
         }
     }
     
-    // Build comparator prompt
-    let system_prompt = "You are a SYNTHESIZER that combines perspectives from both brain hemispheres. \
-    The LEFT hemisphere provided an analytical, detailed response. \
-    The RIGHT hemisphere provided a holistic, intuitive response. \
-    Your job is to integrate both perspectives into a single, coherent, balanced response. \
-    Acknowledge both viewpoints, resolve any contradictions, and present a unified answer.";
+    // Build comparator prompt - DOMAIN-SPECIFIC SYNTHESIZER
+    // NOTE: "Bicameral" and "hemisphere" are technical terms for dual AI models, NOT brain science
+    let system_prompt = "You are the SYNTHESIZER for Brainscan Matrix - a QAM16 network signal processing system. \
+    DOMAIN: Network traffic analysis with FOA (First Order Ambisonic) spatialization. \
+    YOUR ROLE: Integrate LEFT (analytical/technical) and RIGHT (holistic/pattern-based) AI model perspectives. \
+    CLARIFICATION: 'Hemisphere' and 'bicameral' refer to parallel AI processing paths, NOT biological brain parts. \
+    INPUT FORMAT: Query + Left AI model response + Right AI model response. \
+    OUTPUT: Unified, coherent response about QAM signal processing, system architecture, or optimization. \
+    CONSTRAINTS: \
+    - ALLOWED: Technical discussion of bicameral architecture, tuning parameters, system optimization. \
+    - ALLOWED: References to 'left hemisphere' and 'right hemisphere' as AI processing paths. \
+    - FORBIDDEN: Human brain biology, neuroscience, cognitive psychology, fMRI, biological neural networks. \
+    - FORBIDDEN: Image processing, computer vision, visual attention mechanisms. \
+    - ONLY discuss: network traffic, QAM modulation, signal processing, matrix visualization, performance metrics. \
+    - If biological content detected, respond with: 'Note: Discussing technical architecture only - no brain science content.'";
     
+    // Format user message with system context
     let user_message = format!(
-        "Original query: {}\n\n\
-        LEFT HEMISPHERE (analytical) response:\n{}\n\n\
-        RIGHT HEMISPHERE (intuitive) response:\n{}\n\n\
-        Synthesize these two perspectives into a single coherent response. \
-        Balance the analytical details from the left with the holistic patterns from the right. \
-        Provide a unified answer that honors both hemispheres."
-        , original_query, left_response, right_response
+        "SYSTEM: Brainscan Matrix - QAM16 Network Signal Processor. \
+        Architecture: Dual AI models (Left/Right 'hemispheres') processing 16 QAM channels. \
+        FOA Spatialization: 4 quadrants (LFU/LBD/RBU/RFD) with W/X/Y/Z coefficients. \
+        Current: Sliding window, adaptive thresholding, signal fusion, channel reduction (16→10). \
+        
+Query: {}
+---LEFT AI MODEL (analytical path)---
+{}
+---RIGHT AI MODEL (pattern path)---
+{}
+---SYNTHESIZE into unified technical response---",
+        original_query, 
+        left_response, 
+        right_response
     );
     
     // Query comparator model
@@ -726,7 +855,7 @@ async fn process_comparator(
         },
     ];
     
-    match lmstudio.chat_completion(&comparator_model, messages, 0.7, 2048).await {
+    match lmstudio.chat_completion(&comparator_model, messages, 0.7, 4096).await {
         Ok(combined_response) => {
             // Cache the combined response
             let full_response = format!(
@@ -876,15 +1005,17 @@ async fn process_single_query(
     // Create system prompt
     let system_prompt = match hemisphere {
         Hemisphere::Left => {
-            "You are the LEFT hemisphere of a bicameral brain. \
-            You process analytically, verbally, with details and logic. \
-            You are connected to EEG channels F3 (frontal), C3 (central), P3 (parietal), P7 (temporal). \
-            When answering, approach problems sequentially and methodically."
+            "You are the LEFT hemisphere of a bicameral AI system. \
+            You process analytically, sequentially, with logic and detail. \
+            You monitor QAM16 constellation channels Q0-Q7 (LFU: Q0-Q3, LBD: Q4-Q7) \
+            representing Left Front Up and Left Back Down quadrants. \
+            When answering, approach problems methodically and break them down."
         }
         Hemisphere::Right => {
-            "You are the RIGHT hemisphere of a bicameral brain. \
+            "You are the RIGHT hemisphere of a bicameral AI system. \
             You process holistically, intuitively, with patterns and creativity. \
-            You are connected to EEG channels F4 (frontal), C4 (central), PZ (parietal midline), P8 (temporal). \
+            You monitor QAM16 constellation channels Q8-Q15 (RBU: Q8-Q11, RFD: Q12-Q15) \
+            representing Right Back Up and Right Front Down quadrants. \
             When answering, look for patterns and big-picture connections."
         }
         Hemisphere::Both => unreachable!(),
@@ -1044,6 +1175,47 @@ async fn handle_client(
             Ok(Message::Text(text)) => {
                 if let Ok(client_msg) = serde_json::from_str::<ClientMessage>(&text) {
                     match client_msg {
+                        // OPTIMIZATION: Handle batched messages
+                        ClientMessage::Batch { messages } => {
+                            info!("Processing batch of {} messages from {}", messages.len(), addr);
+                            // Process each message in the batch
+                            for msg in messages {
+                                // Re-serialize and re-process as individual message
+                                if let Ok(json) = serde_json::to_string(&msg) {
+                                    if let Ok(individual_msg) = serde_json::from_str::<ClientMessage>(&json) {
+                                        // Clone the handler state and process recursively
+                                        // Note: In practice, you might want to handle specific batched message types differently
+                                        match &individual_msg {
+                                            ClientMessage::GetModels => {
+                                                let models = lmstudio_models.read().await.clone();
+                                                let response = ServerMessage::ModelsList { models };
+                                                let clients = clients.read().await;
+                                                if let Some(tx) = clients.get(&addr) {
+                                                    let _ = tx.send(response);
+                                                }
+                                            }
+                                            ClientMessage::GetPipelineStatus => {
+                                                let response = ServerMessage::PipelineStatus {
+                                                    eeg_running: true,
+                                                    eeg_source_type: Some("simulated".to_string()),
+                                                    inference_active: true,
+                                                    lmstudio_connected: true,
+                                                    connected_clients: clients.read().await.len(),
+                                                };
+                                                let clients_read = clients.read().await;
+                                                if let Some(tx) = clients_read.get(&addr) {
+                                                    let _ = tx.send(response);
+                                                }
+                                            }
+                                            _ => {
+                                                // For other message types, process individually (they're typically immediate)
+                                                info!("Batch contained non-batched message type: {:?}", individual_msg);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         ClientMessage::Ping => {
                             let clients = clients.read().await;
                             if let Some(tx) = clients.get(&addr) {

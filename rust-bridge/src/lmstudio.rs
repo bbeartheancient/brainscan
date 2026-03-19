@@ -15,7 +15,7 @@ pub struct LMStudioClient {
 impl LMStudioClient {
     pub fn new(base_url: String) -> Self {
         let client = Client::builder()
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(60))  // Increased from 30s to 60s for long comparator responses
             .build()
             .expect("Failed to create HTTP client");
 
@@ -152,9 +152,9 @@ impl LMStudioClient {
             LMStudioMessage {
                 role: "system".to_string(),
                 content: match request.coherence_state {
-                    CoherenceState::High => "You are an expert EEG pattern recognition system.".to_string(),
-                    CoherenceState::Low => "You are an expert EEG anomaly detection system.".to_string(),
-                    CoherenceState::Medium => "You are an expert EEG analysis system.".to_string(),
+                    CoherenceState::High => "You are an expert QAM16 constellation pattern recognition system monitoring network signals.".to_string(),
+                    CoherenceState::Low => "You are an expert QAM16 anomaly detection system monitoring network signal integrity.".to_string(),
+                    CoherenceState::Medium => "You are an expert QAM16 network signal analysis system.".to_string(),
                 },
             },
             LMStudioMessage {

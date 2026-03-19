@@ -3,7 +3,112 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use chrono::{DateTime, Utc};
 
-/// EEG Signal Features extracted from 8-channel input
+/// QAM16 Signal for network-based spatialization (replaces EEG)
+/// 16 constellation points mapped to 4 FOA quadrants (4 points per quadrant)
+/// Quadrants: LFU (0-3), LBD (4-7), RBU (8-11), RFD (12-15)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QAMSignal {
+    pub timestamp: DateTime<Utc>,
+    pub frame: u64,
+    pub constellation: Vec<f64>, // 16 QAM constellation points (0.0-1.0)
+    pub snr: f64, // Signal-to-noise ratio in dB
+    pub signal_strength: f64, // 0.0-1.0
+    pub noise_floor: f64, // 0.0-1.0
+    // FOA quadrant values (derived from constellation)
+    pub lfu_quadrant: f64,
+    pub lbd_quadrant: f64,
+    pub rbu_quadrant: f64,
+    pub rfd_quadrant: f64,
+    // Spatialization results
+    pub ambisonic_w: f64,
+    pub ambisonic_x: f64,
+    pub ambisonic_y: f64,
+    pub ambisonic_z: f64,
+    pub coherence: f64,
+    pub impedance_z: f64,
+    // Hemisphere processing
+    pub left_hemisphere: Vec<f64>, // 8 points (LFU + LBD)
+    pub right_hemisphere: Vec<f64>, // 8 points (RBU + RFD)
+    pub left_coherence: f64,
+    pub right_coherence: f64,
+}
+
+impl QAMSignal {
+    pub fn new(frame: u64) -> Self {
+        Self {
+            timestamp: Utc::now(),
+            frame,
+            constellation: vec![0.5; 16], // Default mid-scale
+            snr: 10.0,
+            signal_strength: 0.5,
+            noise_floor: 0.1,
+            lfu_quadrant: 0.5,
+            lbd_quadrant: 0.5,
+            rbu_quadrant: 0.5,
+            rfd_quadrant: 0.5,
+            ambisonic_w: 0.0,
+            ambisonic_x: 0.0,
+            ambisonic_y: 0.0,
+            ambisonic_z: 0.0,
+            coherence: 0.5,
+            impedance_z: 50.0,
+            left_hemisphere: vec![0.5; 8],
+            right_hemisphere: vec![0.5; 8],
+            left_coherence: 0.5,
+            right_coherence: 0.5,
+        }
+    }
+    
+    /// Extract quadrant values from constellation
+    pub fn compute_quadrants(&mut self) {
+        // LFU: points 0-3
+        self.lfu_quadrant = self.constellation[0..4].iter().sum::<f64>() / 4.0;
+        // LBD: points 4-7
+        self.lbd_quadrant = self.constellation[4..8].iter().sum::<f64>() / 4.0;
+        // RBU: points 8-11
+        self.rbu_quadrant = self.constellation[8..12].iter().sum::<f64>() / 4.0;
+        // RFD: points 12-16
+        self.rfd_quadrant = self.constellation[12..16].iter().sum::<f64>() / 4.0;
+        
+        // Populate hemisphere vectors
+        self.left_hemisphere.clear();
+        self.left_hemisphere.extend_from_slice(&self.constellation[0..8]);
+        self.right_hemisphere.clear();
+        self.right_hemisphere.extend_from_slice(&self.constellation[8..16]);
+    }
+    
+    /// Compute FOA ambisonic components using Hadamard matrix coefficients
+    pub fn compute_ambisonic(&mut self) {
+        // W = -(LFU + LBD + RBU + RFD) / 4
+        self.ambisonic_w = -(self.lfu_quadrant + self.lbd_quadrant + 
+                            self.rbu_quadrant + self.rfd_quadrant) / 4.0;
+        
+        // X = 2.83 * (-LFU + LBD + RBU - RFD) / 4
+        self.ambisonic_x = 2.83 * (-self.lfu_quadrant + self.lbd_quadrant + 
+                                   self.rbu_quadrant - self.rfd_quadrant) / 4.0;
+        
+        // Y = 2.83 * (-LFU - LBD + RBU + RFD) / 4
+        self.ambisonic_y = 2.83 * (-self.lfu_quadrant - self.lbd_quadrant + 
+                                   self.rbu_quadrant + self.rfd_quadrant) / 4.0;
+        
+        // Z = 2.83 * (-LFU + LBD - RBU + RFD) / 4 (with coherence modulation)
+        self.ambisonic_z = 2.83 * (-self.lfu_quadrant + self.lbd_quadrant - 
+                                   self.rbu_quadrant + self.rfd_quadrant) / 4.0;
+        
+        // Coherence based on amplitude consistency
+        let amplitudes = [
+            (self.constellation[0] - 0.5).abs() + (self.constellation[1] - 0.5).abs(),
+            (self.constellation[2] - 0.5).abs() + (self.constellation[3] - 0.5).abs(),
+            (self.constellation[4] - 0.5).abs() + (self.constellation[5] - 0.5).abs(),
+            (self.constellation[6] - 0.5).abs() + (self.constellation[7] - 0.5).abs(),
+        ];
+        let avg_amp = amplitudes.iter().sum::<f64>() / 4.0;
+        self.coherence = (avg_amp * 2.0).min(1.0);
+        self.impedance_z = (1.0 - self.coherence) * 100.0;
+    }
+}
+
+/// Legacy EEG Signal Features (for backward compatibility)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignalFeatures {
     pub timestamp: DateTime<Utc>,
@@ -101,6 +206,24 @@ pub struct LMStudioChoice {
     pub finish_reason: Option<String>,
 }
 
+/// Ambisonic components for QAM spatialization
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AmbisonicMessage {
+    pub w: f64, // Omnidirectional
+    pub x: f64, // Left-right  
+    pub y: f64, // Front-back
+    pub z: f64, // Up-down (Z-vector)
+}
+
+/// FOA quadrant values for QAM constellation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuadrantValues {
+    pub lfu: f64, // Left Front Up
+    pub lbd: f64, // Left Back Down
+    pub rbu: f64, // Right Back Up
+    pub rfd: f64, // Right Front Down
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct LMStudioUsage {
     pub prompt_tokens: u32,
@@ -142,6 +265,10 @@ pub enum ClientMessage {
     ClearCache,
     #[serde(rename = "get_cache_stats")]
     GetCacheStats,
+    
+    // OPTIMIZATION: Batch message handling for WebSocket efficiency
+    #[serde(rename = "batch")]
+    Batch { messages: Vec<ClientMessage> },
     
     // Peer-to-peer messaging
     #[serde(rename = "get_peer_id")]
@@ -211,6 +338,18 @@ pub enum ServerMessage {
     #[serde(rename = "eeg_frame")]
     EEGFrame {
         channels: Vec<f64>,
+        timestamp: i64,
+        frame: u64,
+    },
+    #[serde(rename = "qam_signal")]
+    QAMSignalMessage {
+        constellation: Vec<f64>, // 16 QAM constellation points
+        snr: f64,
+        signal_strength: f64,
+        coherence: f64,
+        impedance_z: f64,
+        ambisonic: AmbisonicMessage,
+        quadrants: QuadrantValues,
         timestamp: i64,
         frame: u64,
     },

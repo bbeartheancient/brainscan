@@ -24,10 +24,11 @@ impl BrainscanBridge {
     /// Run the complete bridge
     pub async fn run(self) -> Result<()> {
         info!("╔══════════════════════════════════════════════════════════╗");
-        info!("║   Brainscan Bridge - Bicameral Chat Architecture         ║");
+        info!("║   Brainscan Bridge - QAM16 Network Signal Architecture     ║");
         info!("╠══════════════════════════════════════════════════════════╣");
-        info!("║  EEG Pipeline: Simulated → Matrix → Visualizer          ║");
-        info!("║  Chat Pipeline: Query → Left/Right Models → Responses   ║");
+        info!("║  QAM Pipeline: 16-Constellation → FOA Matrix → Visualizer ║");
+        info!("║  Quadrants: LFU(0-3) | LBD(4-7) | RBU(8-11) | RFD(12-15)║");
+        info!("║  Chat Pipeline: Query → Left/Right Models → Responses     ║");
         info!("╚══════════════════════════════════════════════════════════╝");
         info!("LMStudio: {}", self.config.lmstudio_url);
         info!("Server Port: {}", self.config.inference_port);
@@ -47,12 +48,20 @@ impl BrainscanBridge {
         let models = lmstudio.read().await.get_available_models().to_vec();
         server.set_lmstudio_models(models).await;
 
-        // Start EEG pipeline (runs continuously for visualization)
-        let eeg_handle = match server.start_eeg_pipeline().await {
+        // Start QAM16 pipeline (replaces EEG - sends 16 constellation points for FOA spatialization)
+        let signal_handle = match server.start_qam_pipeline().await {
             Ok(handle) => handle,
             Err(e) => {
-                error!("Failed to start EEG pipeline: {}", e);
-                return Err(e);
+                error!("Failed to start QAM16 pipeline: {}", e);
+                // Fallback to EEG if QAM fails
+                info!("Falling back to EEG pipeline...");
+                match server.start_eeg_pipeline().await {
+                    Ok(handle) => handle,
+                    Err(e2) => {
+                        error!("Failed to start EEG pipeline: {}", e2);
+                        return Err(e2);
+                    }
+                }
             }
         };
 
@@ -69,8 +78,8 @@ impl BrainscanBridge {
 
         // Wait for tasks - both should run indefinitely
         let _result = tokio::select! {
-            res = eeg_handle => {
-                info!("EEG pipeline stopped: {:?}", res);
+            res = signal_handle => {
+                info!("Signal pipeline stopped: {:?}", res);
                 res
             }
             res = server_handle => {

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
-/// Signal processor that extracts features from EEG data
+/// Signal processor that extracts features from signal data
 pub struct SignalProcessor {
     config: BridgeConfig,
 }
@@ -14,32 +14,32 @@ impl SignalProcessor {
         Self { config }
     }
 
-    /// Extract features from 8-channel EEG frame
-    pub fn extract_features(&self, eeg: &[f64], frame_count: u64) -> SignalFeatures {
+    /// Extract features from signal frame
+    pub fn extract_features(&self, signal: &[f64], frame_count: u64) -> SignalFeatures {
         // Ensure we have 8 channels
-        let eeg_array: Vec<f64> = if eeg.len() >= 8 {
-            eeg[..8].to_vec()
+        let signal_array: Vec<f64> = if signal.len() >= 8 {
+            signal[..8].to_vec()
         } else {
-            let mut padded = eeg.to_vec();
+            let mut padded = signal.to_vec();
             padded.resize(8, 0.5);
             padded
         };
 
         // Octonion transform
-        let octonion_output: Vec<f64> = eeg_array.iter()
-            .map(|&v| (v - 1.0).tanh())
+        let octonion_output: Vec<f64> = signal_array.iter()
+            .map(|v: &f64| (*v - 1.0).tanh())
             .collect();
 
         // Ambisonic FOA components
-        let w = eeg_array.iter().sum::<f64>() / 8.0;
-        let x = (eeg_array[0] - eeg_array[1]) / 2.0;
-        let y = (eeg_array[3] - 0.5) * 2.0;
-        let z = (eeg_array[6] - 0.5) * 2.0;
+        let w = signal_array.iter().sum::<f64>() / 8.0;
+        let x = (signal_array[0] - signal_array[1]) / 2.0;
+        let y = (signal_array[3] - 0.5) * 2.0;
+        let z = (signal_array[6] - 0.5) * 2.0;
 
         // Tunnel diode simulation
-        let v_diode = 0.09 + z * 0.1;
+        let v_diode: f64 = 0.09 + z * 0.1;
         let (coherence, impedance) = if v_diode >= 0.05 && v_diode <= 0.35 {
-            let c = 1.0 - ((v_diode - 0.2) / 0.15).abs();
+            let c: f64 = 1.0 - ((v_diode - 0.2) / 0.15).abs();
             (c.max(0.0).min(1.0), 10.0 * (1.0 - c))
         } else {
             (0.3, 22.0)
@@ -52,8 +52,8 @@ impl SignalProcessor {
         // Hemisphere split
         // Left hemisphere: F3(0), C3(2), P3(5), P7(6) - channels 0, 2, 5, 6
         // Right hemisphere: F4(1), C4(4), PZ(6), P8(7) - channels 1, 4, 6, 7
-        let left_hemisphere = vec![eeg_array[0], eeg_array[2], eeg_array[5], eeg_array[6]];
-        let right_hemisphere = vec![eeg_array[1], eeg_array[4], eeg_array[6], eeg_array[7]];
+        let left_hemisphere = vec![signal_array[0], signal_array[2], signal_array[5], signal_array[6]];
+        let right_hemisphere = vec![signal_array[1], signal_array[4], signal_array[6], signal_array[7]];
 
         // Calculate hemisphere-specific coherence
         let coherence_left = left_hemisphere.iter().sum::<f64>() / left_hemisphere.len() as f64;
@@ -62,7 +62,7 @@ impl SignalProcessor {
         SignalFeatures {
             timestamp: chrono::Utc::now(),
             frame: frame_count,
-            eeg_channels: eeg_array,
+            eeg_channels: signal_array,
             octonion_output,
             ambisonic_w: w,
             ambisonic_x: x,
@@ -248,9 +248,10 @@ impl InferenceRequest {
     /// Build LMStudio prompt for pattern recognition
     pub fn build_pattern_prompt(&self) -> String {
         let channel_names = match self.hemisphere {
-            Hemisphere::Left => vec!["F3", "C3", "P3", "P7"],
-            Hemisphere::Right => vec!["F4", "C4", "PZ", "P8"],
-            Hemisphere::Both => vec!["F3", "F4", "C3", "C4", "P3", "PZ", "P7", "P8"],
+            Hemisphere::Left => vec!["Q0", "Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7"], // LFU + LBD
+            Hemisphere::Right => vec!["Q8", "Q9", "Q10", "Q11", "Q12", "Q13", "Q14", "Q15"], // RBU + RFD
+            Hemisphere::Both => vec!["Q0", "Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", 
+                                       "Q8", "Q9", "Q10", "Q11", "Q12", "Q13", "Q14", "Q15"],
         };
 
         let channels_str = self.hemisphere_features.iter()
@@ -260,11 +261,11 @@ impl InferenceRequest {
             .join(", ");
 
         format!(
-            "Analyze EEG pattern for {:?} hemisphere:\n\
+            "Analyze QAM16 constellation pattern for {:?} hemisphere:\n\
             Channels: {}\n\
             Coherence: {:.2}\n\
             State: {:?}\n\n\
-            Classify the brain state and provide confidence score.",
+            Classify the network signal state and provide confidence score.",
             self.hemisphere, channels_str, self.coherence_value, self.coherence_state
         )
     }
