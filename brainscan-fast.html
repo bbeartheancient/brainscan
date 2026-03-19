@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brainscan - 2D Optimized</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg: #0a0a0a;
+            --fg: #fa0;
+            --fg-dim: #553300;
+            --accent: #e60003;
+            --success: #0f0;
+        }
+        
+        body {
+            background: var(--bg);
+            color: var(--fg);
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        /* Scanline effect */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(255, 170, 0, 0.03) 2px,
+                rgba(255, 170, 0, 0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 1000;
+        }
+        
+        #header {
+            padding: 8px 12px;
+            border-bottom: 2px solid var(--fg);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        #header h1 {
+            font-size: 14px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        
+        #status-bar {
+            display: flex;
+            gap: 16px;
+            font-size: 10px;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--fg-dim);
+        }
+        
+        .status-dot.active {
+            background: var(--success);
+            box-shadow: 0 0 4px var(--success);
+        }
+        
+        #main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        #brain-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 2px solid var(--fg);
+            position: relative;
+        }
+        
+        #brain-canvas {
+            flex: 1;
+            width: 100%;
+            image-rendering: pixelated;
+        }
+        
+        #brain-overlay {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            font-size: 10px;
+            color: var(--fg-dim);
+            pointer-events: none;
+        }
+        
+        #hemisphere-panels {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 200px;
+        }
+        
+        .hemisphere-box {
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid var(--fg-dim);
+            padding: 6px;
+            font-size: 9px;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+        
+        .hemisphere-box.left {
+            border-color: var(--accent);
+        }
+        
+        .hemisphere-box.right {
+            border-color: #00aaff;
+        }
+        
+        .hemisphere-title {
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+            font-size: 8px;
+        }
+        
+        .hemisphere-box.left .hemisphere-title { color: var(--accent); }
+        .hemisphere-box.right .hemisphere-title { color: #00aaff; }
+        
+        #sidebar {
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        
+        .panel {
+            border-bottom: 1px solid var(--fg-dim);
+            padding: 10px;
+        }
+        
+        .panel-title {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            color: var(--fg-dim);
+        }
+        
+        /* Chat Section */
+        #chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 200px;
+        }
+        
+        #chat-messages {
+            flex: 1;
+            background: #050505;
+            border: 1px solid var(--fg-dim);
+            padding: 8px;
+            overflow-y: auto;
+            font-size: 10px;
+            line-height: 1.4;
+        }
+        
+        .chat-message {
+            margin-bottom: 8px;
+            padding: 4px 6px;
+            border-left: 2px solid var(--fg-dim);
+        }
+        
+        .chat-message.user {
+            border-left-color: var(--success);
+            color: var(--success);
+        }
+        
+        .chat-message.model {
+            border-left-color: var(--fg);
+        }
+        
+        .chat-message.system {
+            border-left-color: var(--accent);
+            color: var(--accent);
+            font-style: italic;
+        }
+        
+        .chat-time {
+            font-size: 8px;
+            color: var(--fg-dim);
+            margin-bottom: 2px;
+        }
+        
+        #chat-input-container {
+            display: flex;
+            gap: 6px;
+            padding-top: 8px;
+        }
+        
+        #chat-input {
+            flex: 1;
+            background: #000;
+            border: 1px solid var(--fg-dim);
+            color: var(--fg);
+            padding: 6px;
+            font-family: inherit;
+            font-size: 11px;
+        }
+        
+        #chat-input:focus {
+            outline: none;
+            border-color: var(--fg);
+        }
+        
+        /* Buttons */
+        .btn {
+            background: transparent;
+            border: 1px solid var(--fg);
+            color: var(--fg);
+            padding: 4px 8px;
+            font-family: inherit;
+            font-size: 10px;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+        
+        .btn:hover {
+            background: var(--fg);
+            color: var(--bg);
+        }
+        
+        .btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        
+        .btn-row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        
+        /* Model Selection */
+        select {
+            background: #000;
+            border: 1px solid var(--fg-dim);
+            color: var(--fg);
+            padding: 4px;
+            font-family: inherit;
+            font-size: 10px;
+            width: 100%;
+        }
+        
+        /* Waveform Display */
+        #waveform-canvas {
+            width: 100%;
+            height: 60px;
+            border: 1px solid var(--fg-dim);
+            background: #000;
+        }
+        
+        /* Channel Bars */
+        .channel-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 4px;
+            font-size: 9px;
+        }
+        
+        .channel-label {
+            width: 30px;
+        }
+        
+        .channel-meter {
+            flex: 1;
+            height: 8px;
+            background: #111;
+            border: 1px solid var(--fg-dim);
+            position: relative;
+        }
+        
+        .channel-fill {
+            height: 100%;
+            background: var(--fg);
+            transition: width 0.1s;
+        }
+        
+        /* Data Display */
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 9px;
+            padding: 2px 0;
+        }
+        
+        .data-label { color: var(--fg-dim); }
+        .data-value { color: var(--fg); }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--fg-dim);
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--fg);
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>BRAINSCAN // 2D</h1>
+        <div id="status-bar">
+            <div class="status-item">
+                <span class="status-dot" id="bridge-status"></span>
+                <span>BRIDGE</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot" id="eeg-status"></span>
+                <span>EEG</span>
+            </div>
+            <div class="status-item">
+                <span class="status-dot" id="cache-status"></span>
+                <span>CACHE</span>
+            </div>
+        </div>
+    </div>
+    
+    <div id="main">
+        <div id="brain-panel">
+            <canvas id="brain-canvas"></canvas>
+            <div id="brain-overlay">
+                <div>FPS: <span id="fps-counter">0</span></div>
+                <div>FRAME: <span id="frame-counter">0</span></div>
+            </div>
+            <div id="hemisphere-panels">
+                <div class="hemisphere-box left">
+                    <div class="hemisphere-title">LEFT // ANALYTICAL</div>
+                    <div id="left-content">Waiting...</div>
+                </div>
+                <div class="hemisphere-box right">
+                    <div class="hemisphere-title">RIGHT // INTUITIVE</div>
+                    <div id="right-content">Waiting...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="sidebar">
+            <!-- Pipeline Control -->
+            <div class="panel">
+                <div class="panel-title">Pipeline Control</div>
+                <div class="btn-row">
+                    <button class="btn" id="btn-connect">Connect</button>
+                    <button class="btn" id="btn-start" disabled>Start EEG</button>
+                    <button class="btn" id="btn-stop" disabled>Stop</button>
+                </div>
+                <div class="data-row">
+                    <span class="data-label">Status:</span>
+                    <span class="data-value" id="pipeline-status">Disconnected</span>
+                </div>
+                <div class="data-row">
+                    <span class="data-label">Source:</span>
+                    <span class="data-value" id="data-source">None</span>
+                </div>
+            </div>
+            
+            <!-- Model Selection -->
+            <div class="panel">
+                <div class="panel-title">Hemisphere Models</div>
+                <div style="margin-bottom: 8px;">
+                    <select id="left-model">
+                        <option value="">Left Hemisphere...</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <select id="right-model">
+                        <option value="">Right Hemisphere...</option>
+                    </select>
+                </div>
+                <div class="btn-row">
+                    <button class="btn" id="btn-set-models">Set Models</button>
+                    <button class="btn" id="btn-clear-cache">Clear Cache</button>
+                </div>
+            </div>
+            
+            <!-- Chat -->
+            <div class="panel" id="chat-container">
+                <div class="panel-title">Neural Interface</div>
+                <div id="chat-messages"></div>
+                <div id="chat-input-container">
+                    <input type="text" id="chat-input" placeholder="Enter query...">
+                    <button class="btn" id="btn-send">Send</button>
+                </div>
+            </div>
+            
+            <!-- Waveform -->
+            <div class="panel">
+                <div class="panel-title">Signal</div>
+                <canvas id="waveform-canvas"></canvas>
+            </div>
+            
+            <!-- Channel Activity -->
+            <div class="panel">
+                <div class="panel-title">Channel Activity</div>
+                <div id="channel-bars">
+                    <!-- Generated by JS -->
+                </div>
+            </div>
+            
+            <!-- Performance Metrics -->
+            <div class="panel">
+                <div class="panel-title">Performance</div>
+                <div class="data-row">
+                    <span class="data-label">Cache Hit Rate:</span>
+                    <span class="data-value" id="cache-hit-rate">0%</span>
+                </div>
+                <div class="data-row">
+                    <span class="data-label">Queries Cached:</span>
+                    <span class="data-value" id="cache-size">0</span>
+                </div>
+                <div class="data-row">
+                    <span class="data-label">Last Latency:</span>
+                    <span class="data-value" id="last-latency">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="brainscan-fast.js"></script>
+</body>
+</html>
